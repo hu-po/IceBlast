@@ -2,20 +2,20 @@
 
 public class PenguinController : MonoBehaviour
 {
-    public float moveSpeed = 5f;
-    public float rotateSpeed = 10f;
+    public float moveSpeed = 30f;
+    public float rotateSpeed = 30f;
     public float hitForce = 10f;
-    public float ballRange = 5f;
+    public float ballRange = 4f;
     public float respawnDelay = 1f;
     public float clearDistance = 10f;
 
-    public enum State
+    public enum Role
     {
-        Attacking,
-        Defending
+        Attack,
+        Defense
     }
 
-    public State currentState = State.Attacking;
+    public Role myRole = Role.Attack;
     public TextMesh displayText;
 
     public GameObject enemyGoal;
@@ -54,25 +54,49 @@ public class PenguinController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        switch (currentState)
+        switch (myRole)
         {
-            case State.Attacking:
-                PerformAttackBehavior();
-                if (ShouldSwitchToDefense())
+            case Role.Attack:
+                if (BallInRange() && BallIsBetweenMeAndEnemyGoal())
                 {
-                    currentState = State.Defending;
+                    displayText.text = "Shooting";
+                    displayText.color = Color.red;
+                    KickBallTowardsGoal();
+                    break;
                 }
+                if (BallInRange() && BallIsOnOurSide())
+                {
+                    displayText.text = "Dribbling";
+                    displayText.color = Color.blue;
+                    MoveTowards(enemyGoal.transform.position);
+                    break;
+                }
+                displayText.text = "Attack Move";
+                displayText.color = Color.blue;
+                MoveTowards(ball.transform.position);
                 break;
 
-            case State.Defending:
-                PerformDefenseBehavior();
-                if (ShouldSwitchToAttack())
+            case Role.Defense:
+                if (BallInRange() && BallIsOnOurSide() && !TeamIsOnOurSide())
                 {
-                    currentState = State.Attacking;
+                    displayText.text = "Passing";
+                    displayText.color = Color.yellow;
+                    KickBallTowardsTeammate();
+                    break;
                 }
+                if (BallInRange() && BallIsOnOurSide() && EnemyIsOnOurSide())
+                {
+                    displayText.text = "Clearing";
+                    displayText.color = Color.yellow;
+                    KickBallTowardsGoal();
+                    break;
+                }
+                displayText.text = "Zone Defense";
+                displayText.color = Color.green;
+                Vector3 inBetween = (ball.transform.position + ownGoal.transform.position) / 2;
+                MoveTowards(inBetween);
                 break;
         }
-
         ClampPositionWithinRink();
     }
 
@@ -83,7 +107,6 @@ public class PenguinController : MonoBehaviour
 
     private bool IAmCloserToBallThanTeammate()
     {
-        // I am closer to the ball than my teammate
         return (transform.position - ball.transform.position).magnitude < (teammate.transform.position - ball.transform.position).magnitude;
     }
 
@@ -99,6 +122,23 @@ public class PenguinController : MonoBehaviour
         Vector3 ballToEnemyGoal = enemyGoal.transform.position - ball.transform.position;
         Vector3 selfToBall = ball.transform.position - transform.position;
         return selfToBall.magnitude < ballToEnemyGoal.magnitude;
+    }
+
+    private bool EnemyIsOnOurSide()
+    {
+        foreach (GameObject enemyPenguin in enemyPenguins)
+        {
+            if ((enemyPenguin.transform.position - ownGoal.transform.position).magnitude < (enemyPenguin.transform.position - enemyGoal.transform.position).magnitude)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private bool TeamIsOnOurSide()
+    {
+        return (teammate.transform.position - ownGoal.transform.position).magnitude < (teammate.transform.position - enemyGoal.transform.position).magnitude;
     }
 
     private void KickBallTowardsGoal()
@@ -125,63 +165,10 @@ public class PenguinController : MonoBehaviour
         }
     }
 
-    private void PerformAttackBehavior()
-    {
-        if (BallInRange())
-        {
-            displayText.text = "Shooting";
-            displayText.color = Color.red;
-            KickBallTowardsGoal();
-        }
-        else
-        {
-            displayText.text = "Attack Move";
-            displayText.color = Color.blue;
-            MoveTowards(ball.transform.position);
-        }
-    }
-    
-    private void PerformDefenseBehavior()
-    {
-        if (!BallInRange())
-        {
-            displayText.text = "Zone Defense";
-            displayText.color = Color.green;
-            Vector3 inBetween = (ball.transform.position + ownGoal.transform.position) / 2;
-            MoveTowards(inBetween);
-        }
-        else
-        {
-            if ((ball.transform.position - ownGoal.transform.position).magnitude < clearDistance)
-            {
-                displayText.text = "Clearing";
-                displayText.color = Color.yellow;
-                KickBallTowardsTeammate();
-            }
-            else
-            {
-                displayText.text = "Passing";
-                displayText.color = Color.yellow;
-                KickBallTowardsTeammate();
-            }
-        }
-    }
-
-    private bool ShouldSwitchToDefense()
-    {
-        return BallIsOnOurSide() && !IAmCloserToBallThanTeammate();
-    }
-
-    private bool ShouldSwitchToAttack()
-    {
-        return !BallIsOnOurSide() && IAmCloserToBallThanTeammate();
-    }
-
     private void OnCollisionEnter(Collision collision)
     {
-        if (collision.gameObject.CompareTag("Ball"))
+        if (collision.gameObject.CompareTag("Ball") || collision.gameObject.CompareTag("Penguin"))
         {
-            // Apply a hit force to the ball when the penguin collides with it and is attacking
             Vector3 hitDirection = collision.contacts[0].point - transform.position;
             hitDirection = hitDirection.normalized;
             collision.gameObject.GetComponent<Rigidbody>().AddForce(hitDirection * hitForce, ForceMode.Impulse);

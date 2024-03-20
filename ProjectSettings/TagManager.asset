@@ -8,6 +8,7 @@ TagManager:
   - Goal
   - OutOfBounds
   - Rink
+  - Penguin
   layers:
   - Default
   - TransparentFX
