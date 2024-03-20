@@ -49,6 +49,8 @@ public class PenguinController : MonoBehaviour
     private void RespawnPenguin()
     {
         transform.position = initialPosition;
+        // Randomize Z position so we get some variety
+        transform.position = new Vector3(transform.position.x, transform.position.y, Random.Range(-rinkExtents.z, rinkExtents.z));
         gameObject.SetActive(true);
     }
 
